@@ -1,0 +1,3 @@
+/home/winch/0x590/c++/interpretator6502/CMakeFiles/rebuild_cache.dir
+/home/winch/0x590/c++/interpretator6502/CMakeFiles/edit_cache.dir
+/home/winch/0x590/c++/interpretator6502/CMakeFiles/int6502.dir

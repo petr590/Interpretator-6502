@@ -1,0 +1,11 @@
+loop:
+lda COLORS, x
+sta $200, x
+inx
+cpx #16
+bne loop
+
+brk
+
+COLORS:
+dcb 7,10,8,9,2,14,3,13,5,6,4,1,15,12,11,0

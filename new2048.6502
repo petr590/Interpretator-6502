@@ -1,0 +1,447 @@
+define RANDOM $FE
+define INPUT $FF
+define BORDER_COLOR $F
+define BACKGROUND_COLOR $B
+
+define UP    $77
+define DOWN  $73
+define LEFT  $61
+define RIGHT $64
+
+; Zero Page addresses
+define TILES $00 ; 16 bytes
+
+define DST_L $10
+define DST_H $11
+define SRC_L $12
+define SRC_H $13
+
+define DST_COUNTER $14
+define SRC_COUNTER $15
+
+define COLOR $16
+define WIDTH $17
+
+define STEPS_L   $18
+define STEPS_H   $19
+define START_Y   $1A
+define END_Y     $1B
+define CURR_Y    $1C
+define PREV_Y    $1D
+define CURR_TILE $1E
+define PREV_TILE $1F
+define CHANGED   $20
+
+define TILES_ADDRESSES $21 ; 16 bytes
+define TILES_ADDRESSES_ABS $0021
+define A_BUFFER $31
+define Y_BUFFER $32
+
+define NULL $FF
+
+; GPU addresses
+define ROW1 $2E0
+define ROW2 $3E0
+define ROW3 $4E0
+define ROW4 $5E0
+
+define COL1 $207
+define COL2 $307
+define COL3 $407
+define COL4 $507
+
+
+main:
+	jsr drawBackground
+	jsr drawBorder
+
+	lda RANDOM
+	and #$F
+	tax
+	lda #1
+	sta TILES, x
+
+	jsr update
+
+	mainLoop:
+		lda INPUT
+		
+		ldx #0
+		cmp #UP
+		beq main_step
+		
+		ldx #2
+		cmp #DOWN
+		beq main_step
+		
+		ldx #4
+		cmp #LEFT
+		beq main_step
+		
+		ldx #6
+		cmp #RIGHT
+		beq main_step
+		
+		jmp mainLoop
+		
+		main_step:
+			lda STEPS, x
+			sta STEPS_L
+			inx
+			lda STEPS, x
+			sta STEPS_H
+			
+			jsr doStep
+			cmp #1
+			bne main_noUpdate
+				jsr addRandomTile
+				jsr update
+			main_noUpdate:
+			
+			lda #0
+			sta INPUT
+	jmp mainLoop
+brk
+
+
+addRandomTile:
+	ldx #0
+	ldy #0
+	addRandomTile_loop1:
+		lda TILES, x
+		bne addRandomTile_noAdd
+			txa
+			sta TILES_ADDRESSES_ABS, y
+			iny
+		addRandomTile_noAdd:
+
+		inx
+		cpx #16
+	bne addRandomTile_loop1
+
+	; y = count of addresses
+	sty Y_BUFFER
+	dec Y_BUFFER
+
+	lda #0
+	addRandomTile_loop2:
+		sec
+		rol A ; a = 0b1, 0b11, 0b111, ...
+		
+		cmp Y_BUFFER
+	bcc addRandomTile_loop2 ; continue if A < Y_BUFFER
+
+	inc Y_BUFFER
+	sta A_BUFFER
+
+	addRandomTile_loop3:
+		lda RANDOM
+		and A_BUFFER
+		cmp Y_BUFFER
+	bcs addRandomTile_loop3 ; continue if A >= Y_BUFFER
+
+	tax ; A = random number in diapason [0; Y_BUFFER]
+	lda TILES_ADDRESSES, x
+	tax
+	lda #1
+	sta TILES, x
+rts
+
+
+doStep: ; args: STEPS_L, STEPS_H, returns: a = changed
+	lda #0
+	sta CHANGED
+
+	ldy #0
+	doStep_loop1:
+		tya
+		sta START_Y
+		clc
+		adc #4
+		sta END_Y
+
+		lda #NULL
+		sta PREV_Y
+		
+		doStep_loop2:
+			sty CURR_Y
+
+			; load curr
+			lda (STEPS_L), y
+			tax
+			lda TILES, x
+			sta CURR_TILE
+			beq doStep_end
+
+			ldy PREV_Y
+			cpy #NULL
+			beq doStep_prevTileNull
+
+			; load prev
+			lda (STEPS_L), y
+			tax
+			lda TILES, x
+			sta PREV_TILE
+			cmp CURR_TILE
+			bne doStep_moveTile
+				; prev == curr
+
+				; clear current tile
+				ldy CURR_Y
+				lda (STEPS_L), y
+				tax
+				lda #0
+				sta TILES, x
+
+				; set prev tile
+				ldy PREV_Y
+				lda (STEPS_L), y
+				tax
+				inc CURR_TILE
+				lda CURR_TILE
+				sta TILES, x
+
+				lda #1
+				sta CHANGED
+				
+				jmp doStep_end
+
+			doStep_prevTileNull:
+				lda START_Y
+				sta PREV_Y
+				dec PREV_Y
+
+			doStep_moveTile:
+				inc PREV_Y
+
+				ldy CURR_Y
+				cpy PREV_Y
+				beq doStep_end
+
+				; clear current tile
+				lda (STEPS_L), y
+				tax
+				lda #0
+				sta TILES, x
+
+				; set prev tile
+				ldy PREV_Y
+				lda (STEPS_L), y
+				tax
+				lda CURR_TILE
+				sta TILES, x
+
+				lda #1
+				sta CHANGED
+			
+			doStep_end:
+
+			ldy CURR_Y
+			iny
+			cpy END_Y
+		bne doStep_loop2
+
+		cpy #16
+	bne doStep_loop1
+
+	lda CHANGED
+rts
+
+; Order of tiles to process them
+
+STEPS:
+dcb UP_STEPS, DOWN_STEPS, LEFT_STEPS, RIGHT_STEPS
+
+UP_STEPS:
+dcb $0, $4, $8, $C
+dcb $1, $5, $9, $D
+dcb $2, $6, $A, $E
+dcb $3, $7, $B, $F
+
+DOWN_STEPS:
+dcb $C, $8, $4, $0
+dcb $D, $9, $5, $1
+dcb $E, $A, $6, $2
+dcb $F, $B, $7, $3
+
+LEFT_STEPS:
+dcb $0, $1, $2, $3
+dcb $4, $5, $6, $7
+dcb $8, $9, $A, $B
+dcb $C, $D, $E, $F
+
+RIGHT_STEPS:
+dcb $3, $2, $1, $0
+dcb $7, $6, $5, $4
+dcb $B, $A, $9, $8
+dcb $F, $E, $D, $C
+
+
+drawBackground:
+	lda #BACKGROUND_COLOR
+	ldx #0
+	drawBackground_loop:
+	sta $200, x
+	sta $300, x
+	sta $400, x
+	sta $500, x
+	inx
+	bne drawBackground_loop
+rts
+
+
+drawBorder:
+	lda #BORDER_COLOR
+	ldx #0
+	drawBorder_loop1:
+		sta ROW1, x
+		sta ROW2, x
+		sta ROW3, x
+		sta ROW4, x
+		inx
+		cpx #32
+	bne drawBorder_loop1
+
+	ldx #0
+	drawBorder_loop2:
+		lda #BORDER_COLOR
+		sta COL1, x
+		sta COL2, x
+		sta COL3, x
+		sta COL4, x
+		txa
+		clc
+		adc #$8
+		tax
+	bne drawBorder_loop2
+rts
+
+
+update:
+	ldx #0
+
+	update_loop:
+		txa
+		pha
+		jsr drawTile
+		pla
+		tax
+
+		inx
+		cpx #16
+	bne update_loop
+rts
+
+
+drawTile: ; args: index = X
+	lda TILES, x
+	tay
+
+	lda COLORS, y
+	sta COLOR
+
+	tya
+	asl A ; A *= 2
+	tay
+
+	txa
+	asl A ; A *= 2
+	tax
+
+	lda EXPONENTS_DST, x
+	sta DST_L
+	lda EXPONENTS, y
+	sta SRC_L
+
+	inx
+	iny
+
+	lda EXPONENTS_DST, x
+	sta DST_H
+	lda EXPONENTS, y
+	sta SRC_H
+
+	lda #5
+	sta WIDTH
+
+	jsr copy
+rts
+
+
+copy: ; args: WIDTH, SRC_L, SRC_H, DST_L, DST_H
+	lda #0
+	sta DST_COUNTER
+	sta SRC_COUNTER
+
+	copy_loop1:
+		ldy SRC_COUNTER
+		lda (SRC_L), y
+		tax
+		
+		copy_loop2:
+			txa
+			lsr A
+			tax
+			
+			bcc BACKGROUND
+			lda COLOR
+			jmp BACKGROUND_END
+			BACKGROUND:
+			lda #BACKGROUND_COLOR
+			BACKGROUND_END:
+			
+			ldy DST_COUNTER
+			sta (DST_L), y
+			
+			inc DST_COUNTER
+			lda DST_COUNTER
+			and #$7
+			cmp WIDTH
+		bne copy_loop2
+		
+		inc SRC_COUNTER
+		
+		lda DST_COUNTER
+		sec
+		sbc WIDTH
+		clc
+		adc #32
+		sta DST_COUNTER
+		
+		cmp #160 ; 32 * 5
+	bne copy_loop1
+rts
+
+
+COLORS:
+dcb $0, $A, $7, $8, $2, $9, $6, $E, $3, $D, $5, $4, $1, $1, $1, $1, $1
+
+
+EXPONENTS_DST:
+dcb $221, $229, $231, $239
+dcb $321, $329, $331, $339
+dcb $421, $429, $431, $439
+dcb $521, $529, $531, $539
+
+EXPONENTS:
+dcb E0, E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, E13, E14, E15, E16
+
+; Bitwise encoded images
+
+E0:  dcb $00,$00,$00,$00,$00
+E1:  dcb $04,$06,$04,$04,$0E
+E2:  dcb $0E,$08,$0E,$02,$0E
+E3:  dcb $0E,$08,$0E,$08,$0E
+E4:  dcb $0A,$0A,$0E,$08,$08
+E5:  dcb $0E,$02,$0E,$08,$0E
+E6:  dcb $0E,$02,$0E,$0A,$0E
+E7:  dcb $0E,$08,$04,$04,$04
+E8:  dcb $0E,$0A,$0E,$0A,$0E
+E9:  dcb $0E,$0A,$0E,$08,$0E
+E10: dcb $1D,$15,$15,$15,$1D
+E11: dcb $12,$1B,$12,$12,$12
+E12: dcb $1D,$11,$1D,$05,$1D
+E13: dcb $1D,$11,$1D,$11,$1D
+E14: dcb $15,$15,$1D,$11,$11
+E15: dcb $1D,$05,$1D,$11,$1D
+E16: dcb $1D,$05,$1D,$15,$1D

@@ -1,0 +1,208 @@
+define random $FE
+;define x $00
+;define y $01
+define gpu $0200
+define gpuPtrL $02
+define gpuPtrH $03
+define tilesPtrL $04
+define tilesPtrH $05
+define borderColor $0F
+
+jsr drawBorders
+jsr setTilesPtr
+
+lda #$00
+
+drawNextTile:
+pha
+ldx #2
+jsr drawTile
+pla
+clc
+adc #1
+cmp #16
+bne drawNextTile
+
+brk
+
+
+setGpuPtr: ; args: high (A), low (X)
+           ; affects: A += 2
+clc
+adc #$02
+sta gpuPtrH
+stx gpuPtrL
+rts
+
+
+setTilesPtr: ; similarly to setGpuPtr func
+jmp getTilesAddress ; Idk how to get address of label direct
+getTilesAddressReturn:
+pla
+clc
+adc #4
+sta tilesPtrL
+pla
+adc #0
+sta tilesPtrH
+rts
+
+
+drawBorders:
+ldx #$00
+
+drawLine1:
+txa
+ldx #$E0
+jsr setGpuPtr
+tax
+dex ; setGpuPtr adds two to A, so we have to decrement X to get incremented value
+ldy #0
+lda #borderColor
+
+drawPixel1:
+sta (gpuPtrL), Y
+iny
+cpy #$20
+bne drawPixel1
+
+cpx #$04
+bne drawLine1
+
+ldx #$07
+
+drawLine2:
+lda #$00
+jsr setGpuPtr
+txa
+pha ; push X
+
+
+ldx #$00
+ldy #$00
+
+drawPixel2:
+lda #borderColor
+sta (gpuPtrL), Y
+
+tya
+clc
+adc #$20
+tay
+lda gpuPtrH
+adc #$00
+sta gpuPtrH
+
+inx
+cpx #$20
+bne drawPixel2
+
+pla ; pull X
+clc
+adc #$08
+tax
+cpx #$27
+bne drawLine2
+
+rts
+
+
+drawTile: ; args: index (A), value (X)
+tay
+txa
+pha ; push value
+tya
+rol A
+rol A
+rol A
+and #$18
+clc
+adc #$21
+tax
+tya
+ror A
+ror A
+and #$3
+jsr setGpuPtr
+
+pla ; pull value
+tax
+calcTilesAddr:
+clc
+adc #25
+dex
+cpx #0
+bne calcTilesAddr
+ldx tilesPtrL
+
+
+ldx #0
+ldy #0
+
+drawPixel3:
+lda (tilesPtrL), Y
+sta (gpuPtrL), Y
+
+inx
+iny
+cpx #5
+bne drawPixel3
+
+ldx #0
+lda gpuPtrL
+clc
+adc #27
+sta gpuPtrL
+
+cpy #25
+bne drawPixel3
+
+rts
+
+getTilesAddress:
+jsr tilesRawAddress
+tilesRawAddress:
+jmp getTilesAddressReturn
+
+tiles:
+dcb 0,0,0,0,0
+dcb 0,0,0,0,0
+dcb 0,0,0,0,0
+dcb 0,0,0,0,0
+dcb 0,0,0,0,0
+
+dcb 0,0,1,0,0
+dcb 0,1,1,0,0
+dcb 0,0,1,0,0
+dcb 0,0,1,0,0
+dcb 0,1,1,1,0
+
+dcb 0,1,1,0,0
+dcb 1,0,0,1,0
+dcb 0,0,0,1,0
+dcb 0,0,1,0,0
+dcb 1,1,1,1,0
+
+dcb 0,1,0,1,0
+dcb 0,1,0,1,0
+dcb 0,1,1,1,0
+dcb 0,0,0,1,0
+dcb 0,0,0,1,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

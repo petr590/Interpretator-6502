@@ -1,0 +1,36 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/winch/0x590/c++/interpretator6502/src/executor.cpp
+executor.h
+/home/winch/0x590/c++/interpretator6502/src/executor.h
+draw.h
+/home/winch/0x590/c++/interpretator6502/src/draw.h
+error_codes.h
+/home/winch/0x590/c++/interpretator6502/src/error_codes.h
+cstring
+-
+vector
+-
+thread
+-
+ncurses.h
+-
+
+include/draw.h
+cstdint
+-
+
+include/error_codes.h
+
+include/executor.h
+vector
+-
+cstdint
+-
+
