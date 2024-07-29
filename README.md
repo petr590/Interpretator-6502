@@ -31,10 +31,10 @@ When rendering the display, the highest half-byte is ignored.
 
 ## Building the project:
 ```sh
-	git clone https://github.com/petr590/Interpretator-6502.git
-	cd Interpretator-6502/
-	cmake -DCMAKE_BUILD_TYPE=Release
-	make
+git clone https://github.com/petr590/Interpretator-6502.git
+cd Interpretator-6502/
+cmake . -DCMAKE_BUILD_TYPE=Release
+make
 ```
 
 ## Launch:
