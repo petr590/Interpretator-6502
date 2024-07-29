@@ -30,10 +30,12 @@ The random generator is located at **0xFE**, and the last pressed arrow is at **
 When rendering the display, the highest half-byte is ignored.
 
 ## Building the project:
-`git clone https://github.com/petr590/Interpretator-6502.git `
-`cd Interpretator-6502/`
-`cmake -DCMAKE_BUILD_TYPE=Release`
-`make`
+```sh
+	git clone https://github.com/petr590/Interpretator-6502.git
+	cd Interpretator-6502/
+	cmake -DCMAKE_BUILD_TYPE=Release
+	make
+```
 
 ## Launch:
 `./int6502 <file>`
