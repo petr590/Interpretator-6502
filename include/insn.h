@@ -1,12 +1,12 @@
-#ifndef JIT6502_INSN_H
-#define JIT6502_INSN_H
+#ifndef INT6502_INSN_H
+#define INT6502_INSN_H
 
 #include <functional>
 #include <string>
 #include <vector>
 #include <map>
 
-namespace jit6502 {
+namespace int6502 {
 	
 	static const uint16_t
 			STACK_POS = 0x100,
@@ -235,4 +235,4 @@ namespace jit6502 {
 	extern int initLabels(std::vector<uint8_t>& code, std::map<std::string, size_t>& labels);
 }
 
-#endif /* JIT6502_INSN_H */
+#endif /* INT6502_INSN_H */

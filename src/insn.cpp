@@ -8,7 +8,7 @@
 #include <cstdarg>
 #include <cassert>
 
-namespace jit6502 {
+namespace int6502 {
 
 	using std::string;
 	using std::vector;

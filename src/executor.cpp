@@ -1,20 +1,14 @@
 #include "executor.h"
 #include "insn.h"
-#include "draw.h"
+#include "drawer.h"
+#include "scroll.h"
 #include "error_codes.h"
 #include <cstring>
 #include <vector>
 #include <thread>
 #include <ncurses.h>
 
-#ifndef NDEBUG
-#include <fstream>
-#endif
-
-namespace jit6502 {
-	#ifndef NDEBUG
-	std::ofstream log("log.txt");
-	#endif
+namespace int6502 {
 	
 	
 	using std::vector;
@@ -208,27 +202,16 @@ namespace jit6502 {
 		return true;
 	}
 	
-	void dump(const char* header, uint8_t* mem, size_t offset, size_t lineSize, size_t lines) {
-		printw(header);
-		addch('\n');
-		
-		for (size_t i = 0; i < lines; ++i) {
-			
-			size_t base = offset + i * lineSize;
-			printw("0x%04lx:", base);
-			
-			for (size_t j = 0; j < lineSize; ++j) {
-				printw(" %02x", mem[base + j]);
-			}
-			
-			addch('\n');
-		}
-		
-		addch('\n');
-	}
 	
+	struct processor_state {
+		uint8_t a, x, y, sp;
+		uint16_t pc;
+		uint8_t flags;
+	};
 	
-	void run(uint8_t* mem) {
+	// mem - память, аллоцированная для ассемблера
+	// state - указатель на итоговое состояние процессора
+	int run(uint8_t* mem, processor_state* state) {
 		{
 			static bool unused = initSizes();
 			(void)unused;
@@ -296,6 +279,15 @@ namespace jit6502 {
 			
 			#define PUSH(val) (mem[STACK_POS + sp--] = uint8_t(val))
 			#define PULL() mem[STACK_POS + ++sp]
+			
+			#define PACK_FLAGS() uint8_t(N << 7 | V << 6 | 1 << 5 | B << 4 | D << 3 | I << 2 | Z << 1 | C)
+			#define FLAG_N(val) (((val) >> 7) & 0x1)
+			#define FLAG_V(val) (((val) >> 6) & 0x1)
+			#define FLAG_B(val) (((val) >> 4) & 0x1)
+			#define FLAG_D(val) (((val) >> 3) & 0x1)
+			#define FLAG_I(val) (((val) >> 2) & 0x1)
+			#define FLAG_Z(val) (((val) >> 1) & 0x1)
+			#define FLAG_C(val) (((val) >> 0) & 0x1)
 			
 			// Буферные переменные
 			uint8_t u8;
@@ -465,19 +457,18 @@ namespace jit6502 {
 				case TXS: sp = x;      break; // Не влияет на флаги
 				
 				case PHA: PUSH(a); break;
-				case PHP: PUSH(N << 7 | V << 6 | 1 << 5 | B << 4 | D << 3 | I << 2 | Z << 1 | C); break;
+				case PHP: PUSH(PACK_FLAGS()); break;
 				
 				case PLA: a = PULL(); setNZ(a); break;
 				case PLP:
 					u8 = PULL();
-					N = (u8 >> 7) & 0x1;
-					V = (u8 >> 6) & 0x1;
-					
-					B = (u8 >> 4) & 0x1;
-					D = (u8 >> 3) & 0x1;
-					I = (u8 >> 2) & 0x1;
-					Z = (u8 >> 1) & 0x1;
-					C = (u8 >> 0) & 0x1;
+					N = FLAG_N(u8);
+					V = FLAG_V(u8);
+					B = FLAG_B(u8);
+					D = FLAG_D(u8);
+					I = FLAG_I(u8);
+					Z = FLAG_Z(u8);
+					C = FLAG_C(u8);
 					break;
 				
 				case BEQ: if (Z == 1) pc += int8_t(imm); break;
@@ -519,43 +510,25 @@ namespace jit6502 {
 				case NOP: break;
 				
 				default:
-					ncursesMutex.lock();
-					mvprintw(WIN_HEIGHT, 0, "Error: unknown instruction $%02x", insn);
-					ncursesMutex.unlock();
-					return;
+					addLine(30, "Error: unknown instruction $%02x", insn);
+					return UNKNOWN_INSTRUCTION_ERROR;
 			}
 			
 			pc += SIZES[insn];
 		}
 		
 		
-		ncursesMutex.lock();
-		
-		mvprintw(WIN_HEIGHT, 0, "a = $%02x, x = $%02x, y = $%02x, sp = $%02x, pc = $%03x\n", a, x, y, sp, pc);
-		
-		printw("N V - B D I Z C\n");
-		printw("%d %d 1 %d %d %d %d %d\n\n", N, V, B, D, I, Z, C);
-		
-		dump("Zero page dump:", mem, 0, 32, 8);
-		dump("Stack dump:", mem, STACK_POS, 32, 8);
-		dump("GPU dump:", mem, GPU_POS, 32, 8);
-		dump("Code dump:", mem, CODE_POS, 32, 8);
-		
-		scrl(-30);
-		
-		refresh();
-		
-		ncursesMutex.unlock();
-		
-		
-		for (;;) {
-			switch (getch()) {
-				case KEY_UP:   scrl(-1); break;
-				case KEY_DOWN: scrl(+1); break;
-				case 'q': return;
-			}
-		}
+		state->a = a;
+		state->x = x;
+		state->y = y;
+		state->sp = sp;
+		state->pc = pc;
+		state->flags = PACK_FLAGS();
+		return EXIT_SUCCESS;
 	}
+	
+	
+	
 	
 	
 	int executeCode(const vector<uint8_t>& code) {
@@ -571,14 +544,49 @@ namespace jit6502 {
 		
 		std::thread drawThread(draw, mem + INPUT_POS, mem + GPU_POS);
 		
-		run(mem);
+		processor_state state;
+		int res = run(mem, &state);
 		
 		stopped = true;
 		drawThread.join();
 		
+		if (res != EXIT_SUCCESS) {
+			free(mem);
+			return res;
+		}
+		
+		
+		addLine(46, "a = $%02x, x = $%02x, y = $%02x, sp = $%02x, pc = $%03x", state.a, state.x, state.y, state.sp, state.pc);
+		
+		addLine("N V - B D I Z C");
+		addLine(15, "%d %d 1 %d %d %d %d %d",
+			FLAG_N(state.flags),
+			FLAG_V(state.flags),
+			FLAG_B(state.flags),
+			FLAG_D(state.flags),
+			FLAG_I(state.flags),
+			FLAG_Z(state.flags),
+			FLAG_C(state.flags)
+		);
+		
+		dump("Zero page dump:", mem, 0,         16, 16);
+		dump("Stack dump:",     mem, STACK_POS, 16, 16);
+		dump("GPU dump:",       mem, GPU_POS,   16, 64);
+		dump("Code dump:",      mem, CODE_POS,  16, 16);
 		
 		free(mem);
+		mem = NULL;
 		
-		return EXIT_SUCCESS;
+		printLines();
+		refresh();
+		
+		
+		for (;;) {
+			switch (getch()) {
+				case KEY_UP:   scrollUp();   break;
+				case KEY_DOWN: scrollDown(); break;
+				case 'q': return EXIT_SUCCESS;
+			}
+		}
 	}
 }

@@ -1,12 +1,13 @@
 #include "translator.h"
 #include "executor.h"
+#include "drawer.h"
 #include "error_codes.h"
 #include "util.h"
 #include <csignal>
 #include <vector>
 #include <ncurses.h>
 
-namespace jit6502 {
+namespace int6502 {
 	int run(const char* filename) {
 		std::vector<uint8_t> code;
 		
@@ -19,6 +20,7 @@ namespace jit6502 {
 
 
 void end_ncurses() {
+	int6502::restoreDefaultColors();
 	nodelay(stdscr, false);
 	keypad(stdscr, false);
 	echo();
@@ -33,7 +35,7 @@ void on_signal(int signum) {
 
 
 int main(int argc, const char* args[]) {
-	using namespace jit6502;
+	using namespace int6502;
 
 	if (argc != 2) {
 		return error(ARGUMENTS_ERROR, "Usage: %s <file>", args[0]);
@@ -54,7 +56,7 @@ int main(int argc, const char* args[]) {
 	curs_set(false);
 	noecho();
 	keypad(stdscr, true);
-	scrollok(stdscr, true);
+	saveDefaultColors();
 	
 	return run(args[1]);
 }

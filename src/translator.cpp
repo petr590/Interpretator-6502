@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace jit6502 {
+namespace int6502 {
 	using std::string;
 	using std::vector;
 	using std::map;

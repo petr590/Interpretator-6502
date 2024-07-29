@@ -1,11 +1,11 @@
-#ifndef JIT6502_UTIL_H
-#define JIT6502_UTIL_H
+#ifndef INT6502_UTIL_H
+#define INT6502_UTIL_H
 
 #include <cstdarg>
 #include <string>
 #include <algorithm>
 
-namespace jit6502 {
+namespace int6502 {
 	
 	inline void ltrim(std::string& s) {
     	s.erase(s.begin(), std::find_if(s.begin(), s.end(), [] (char ch) { return !std::isspace(ch); }));
@@ -62,4 +62,4 @@ namespace jit6502 {
 	}
 }
 
-#endif /* JIT6502_UTIL_H */
+#endif /* INT6502_UTIL_H */
